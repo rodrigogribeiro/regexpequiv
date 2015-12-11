@@ -131,3 +131,15 @@ module Syntax.RegExp {Token : Set}(eqTokenDec : Decidable {A = Token} _==_)  whe
 
                          part2 : forall xs e -> xs <-[[ e ]] -> xs <-[[ e o Eps ]]
                          part2 xs e pr = pr * Eps <= sym (lem xs)
+
+
+  -- lemma concatenation empty
+
+  lemConcatEmpL : (e : RegExp) -> (Emp o e) :=: Emp
+  lemConcatEmpL e xs = part1 xs e , part2 xs e
+                       where
+                         part1 : forall xs e -> xs <-[[ Emp o e ]] -> xs <-[[ Emp ]]
+                         part1 xs e (() * pr' <= eq)
+
+                         part2 : forall xs e -> xs <-[[ Emp ]] -> xs <-[[ Emp o e ]]
+                         part2 xs e ()
