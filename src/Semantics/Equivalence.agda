@@ -174,4 +174,5 @@ module Semantics.Equivalence {Token : Set}(eqTokenDec : Decidable {A = Token} _=
                       part1 xs e (( _ <+ pr) *) = (_ <+ pr) *
 
                       part2 : forall xs e -> xs <-[[ (Eps + e) * ]] -> xs <-[[ e * ]]
-                      part2 xs e (pr *) = {!!}
+                      part2 xs e ((_ +> (pr * pr' <= eq)) *) rewrite eq = {!(lemChoiceEmpL (lemChoiceComm e) xs) * ? <= ?!}
+                      part2 xs e ((_ <+ pr) *) = (_ <+ pr) *
