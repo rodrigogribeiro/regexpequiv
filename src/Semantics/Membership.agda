@@ -36,3 +36,6 @@ module Semantics.Membership {Token : Set}(eqTokenDec : Decidable {A = Token} _==
   Emp<-Inv : {xs : List Token} -> not (xs <-[[ Emp ]])
   Emp<-Inv ()
 
+  Eps<-Inv : {xs : List Token} -> xs <-[[ Eps ]] -> xs == []
+  Eps<-Inv {xs = []} Eps = refl
+

@@ -171,6 +171,15 @@ module Semantics.Equivalence {Token : Set}(eqTokenDec : Decidable {A = Token} _=
                          part2 : forall xs e -> xs <-[[ Emp ]] -> xs <-[[ Emp o e ]]
                          part2 xs e ()
 
+  lemConcatEmpR : (e : RegExp) -> (e o Emp) :=: Emp
+  lemConcatEmpR e xs = part1 xs e , part2 xs e
+                       where
+                         part1 : forall xs e -> xs <-[[ e o Emp ]] -> xs <-[[ Emp ]]
+                         part1 xs e (_ * () <= _)
+
+                         part2 : forall xs e -> xs <-[[ Emp ]] -> xs <-[[ e o Emp ]]
+                         part2 xs e ()
+
   -- lemma concatenation is associative
 
   lemConcatAssoc : (e e' e'' : RegExp) -> (e o e' o e'') :=: ((e o e') o e'')
@@ -240,22 +249,32 @@ module Semantics.Equivalence {Token : Set}(eqTokenDec : Decidable {A = Token} _=
                       part2 xs e ((_ +> ((_<+_ {xs = []} _ Eps) * pr' <= eq)) *) rewrite eq = part2 _ _ pr'
                       part2 xs e ((_ <+ pr) *) = (_ <+ pr) *
 
+  subsetLemma : forall {xs} e -> xs <-[[ e ]] -> xs <-[[ e * ]]
+  subsetLemma {xs = xs} e pr = (_ +> pr * ((_ <+ Eps) *) <= solve 1 (\ xs -> xs :== xs :++ :[]) refl xs) *
+  
+
   lemmaKleeneIdem : (e : RegExp) -> e * :=: (e *) *
-  lemmaKleeneIdem e xs = part1 e , {!!}
-                         where
-                           subsetLemma : forall {xs} e -> xs <-[[ e ]] -> xs <-[[ e * ]]
-                           subsetLemma Eps Eps = (_ <+ Eps) *
-                           subsetLemma {xs = .a :: []}(# .a) (# a) = (_ +> {!!}) *
-                           subsetLemma ._ (pr * pr' <= eq) = {!!}
-                           subsetLemma ._ (e' <+ pr) = {!!}
-                           subsetLemma ._ (e₁ +> pr) = {!!}
-                           subsetLemma ._ (pr *) = {!!}
-                           
+  lemmaKleeneIdem e xs = part1 e , part2 e
+                         where                           
                            part1 : forall {xs} e -> xs <-[[ e * ]] -> xs <-[[ (e *) * ]]
-                           part1 e ((_ +> (pr * pr' <= eq)) *) rewrite eq = (_ +> subsetLemma _ pr * {!!} <= refl) *
+                           part1 e ((_ +> (pr * pr' <= eq)) *) rewrite eq = (_ +> (subsetLemma _ pr) * (subsetLemma _ pr') <= refl) *
                            part1 e ((_ <+ pr) *) = (_ <+ pr) *
 
+                           part2 : forall {xs} e -> xs <-[[ (e *) * ]] -> xs <-[[ e * ]]
+                           part2 e ((_ +> ((_ <+ pr) *) * pr' <= eq) *) rewrite eq | Eps<-Inv pr = part2 _ pr'
+                           part2 e ((_ +> ((_ +> pr) *) * pr' <= eq) *) rewrite eq = (_ +> {!!}) *
+                           part2 e ((_ <+ pr ) *) = (_ <+ pr) *
+
   -- algebraic structure of regular expressions
+
+  concatSemigroup : Semigroup _ _
+  concatSemigroup = record {
+                    Carrier = RegExp
+                    ; _≈_ = _:=:_
+                    ; _∙_ = _o_
+                    ; isSemigroup = record { isEquivalence = RegExpEquiv
+                                   ; assoc = \ e e' e'' xs -> :=:-sym (lemConcatAssoc e e' e'') xs
+                                   ; ∙-cong = :=:-concatCong } }
 
   concatMonoid : Monoid _ _
   concatMonoid
@@ -265,11 +284,19 @@ module Semantics.Equivalence {Token : Set}(eqTokenDec : Decidable {A = Token} _=
              ; ε = Eps
              ; isMonoid
                = record {
-                        isSemigroup
-                          = record { isEquivalence = RegExpEquiv
-                                   ; assoc = \ e e' e'' xs -> :=:-sym (lemConcatAssoc e e' e'') xs
-                                   ; ∙-cong = :=:-concatCong }
+                        isSemigroup = isSemigroup concatSemigroup
                         ; identity = lemConcatEpsR , lemConcatEpsL } }
+      where
+        open Semigroup 
+
+  choiceSemigroup : Semigroup _ _
+  choiceSemigroup = record { Carrier = RegExp
+                           ; _≈_ = _:=:_
+                           ; _∙_ = _+_
+                           ; isSemigroup = record {
+                                   isEquivalence = RegExpEquiv
+                                   ; assoc = \ e e' e'' xs -> :=:-sym (lemChoiceAssoc e e' e'') xs
+                                   ; ∙-cong = :=:-choiceCong } }
 
 
   choiceMonoid : Monoid _ _
@@ -281,8 +308,51 @@ module Semantics.Equivalence {Token : Set}(eqTokenDec : Decidable {A = Token} _=
              ; isMonoid
                = record {
                         isSemigroup
-                          = record {
-                                   isEquivalence = RegExpEquiv
-                                   ; assoc = \ e e' e'' xs -> :=:-sym (lemChoiceAssoc e e' e'') xs
-                                   ; ∙-cong = :=:-choiceCong }
+                          = isSemigroup choiceSemigroup
                         ; identity = lemChoiceEmpR , lemChoiceEmpL } }
+      where
+        open Semigroup
+
+  regExpSemiring : Semiring _ _
+  regExpSemiring = record
+                     { Carrier = RegExp
+                     ; _≈_ = _:=:_
+                     ; _+_ = _+_
+                     ; _*_ = _o_
+                     ; 0# = Emp
+                     ; 1# = Eps
+                     ; isSemiring
+                       = record {
+                          isSemiringWithoutAnnihilatingZero
+                          = record {
+                            +-isCommutativeMonoid = record {
+                                                    isSemigroup = isSemigroup choiceSemigroup
+                                                    ; identityˡ = lemChoiceEmpR
+                                                    ; comm = lemChoiceComm }
+                            ; *-isMonoid = Monoid.isMonoid concatMonoid
+                            ; distrib = leftdistr , (λ x y z xs → rightdistr y z x xs) }
+                          ; zero = lemConcatEmpL , lemConcatEmpR }
+                     }
+                   where
+                     open Semigroup
+                     leftdistr : forall (e e' e'' : RegExp) -> e o (e' + e'') :=: (e o e') + (e o e'')
+                     leftdistr e e' e'' xs = part1 e e' e'' xs , part2 e e' e'' xs
+                                             where
+                                               part1 : forall e e' e'' xs -> xs <-[[ e o (e' + e'') ]] -> xs <-[[ (e o e') + (e o e'') ]]
+                                               part1 e e' e'' xs (pr * (_ +> pr') <= eq) rewrite eq = _ +> pr * pr' <= Relation.Binary.PropositionalEquality.refl
+                                               part1 e e' e'' xs (pr * (_ <+ pr') <= eq) rewrite eq = _ <+ pr * pr' <= Relation.Binary.PropositionalEquality.refl
+
+                                               part2 : forall e e' e'' xs -> xs <-[[ (e o e') + (e o e'') ]] -> xs <-[[ e o (e' + e'') ]]
+                                               part2 e e' e'' xs (_ <+ (pr * pr' <= eq)) rewrite eq = pr * (_ <+ pr') <= Relation.Binary.PropositionalEquality.refl
+                                               part2 e e' e'' xs (_ +> (pr * pr' <= eq)) rewrite eq = pr * (_ +> pr') <= Relation.Binary.PropositionalEquality.refl
+
+                     rightdistr : forall (e e' e'' : RegExp) -> ((e + e') o e'') :=: ((e o e'') + (e' o e''))
+                     rightdistr e e' e'' xs = part1 e e' e'' xs , part2 e e' e'' xs
+                                              where
+                                                part1 : forall e e' e'' xs -> xs <-[[ (e + e') o e'' ]] -> xs <-[[ e o e'' + e' o e'' ]]
+                                                part1 e e' e'' xs ((_ <+ pr) * pr' <= eq) rewrite eq = _ <+ (pr * pr' <= Relation.Binary.PropositionalEquality.refl)
+                                                part1 e e' e'' xs ((_ +> pr) * pr' <= eq) rewrite eq = _ +> (pr * pr' <= Relation.Binary.PropositionalEquality.refl)
+
+                                                part2 : forall e e' e'' xs -> xs <-[[ e o e'' + e' o e'' ]] -> xs <-[[ (e + e') o e'' ]]
+                                                part2 e e' e'' xs (_ <+ (pr * pr' <= eq)) rewrite eq = (_ <+ pr) * pr' <= Relation.Binary.PropositionalEquality.refl
+                                                part2 e e' e'' xs (_ +> (pr * pr' <= eq)) rewrite eq = (_ +> pr) * pr' <= Relation.Binary.PropositionalEquality.refl
