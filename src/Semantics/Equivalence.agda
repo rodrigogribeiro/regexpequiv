@@ -1,6 +1,6 @@
 open import Algebra
 
-open import Data.List as List
+open import Data.List as List renaming (_∷_ to _::_)
 open import Data.List.Properties
 open List-solver renaming (nil to :[] ; _⊕_ to _:++_; _⊜_ to _:==_)
 open import Data.Product renaming (_×_ to _*_ ; proj₁ to fst ; proj₂ to snd)
@@ -52,6 +52,18 @@ module Semantics.Equivalence {Token : Set}(eqTokenDec : Decidable {A = Token} _=
                                part2 pe pf (_*_<=_ {xs = xs}{ys = ys} pr pr' eq) rewrite eq = snd (pe xs) pr * snd (pf ys) pr' <= refl
 
 
+  :=:-choiceCong : forall {e e' f f' : RegExp} -> e :=: e' -> f :=: f' -> (e + f) :=: (e' + f')
+  :=:-choiceCong pr pr' xs = part1 pr pr' , part2 pr pr'
+                             where
+                               part1 : forall {e e' f f' : RegExp}{xs} -> e :=: e' -> f :=: f' -> xs <-[[ e + f ]] -> xs <-[[ e' + f' ]]
+                               part1 pe pf (_+>_ {xs = xs} _ pr) = _ +> (fst (pf xs)) pr
+                               part1 pe pf (_<+_ {xs = xs} _ pr) = _ <+ (fst (pe xs)) pr
+
+                               part2 : forall {e e' f f' : RegExp}{xs} -> e :=: e' -> f :=: f' -> xs <-[[ e' + f' ]] -> xs <-[[ e + f ]]
+                               part2 pe pf (_+>_ {xs = xs} _ pr) = _ +> snd (pf xs) pr
+                               part2 pe pf (_<+_ {xs = xs} _ pr) = _ <+ snd (pe xs) pr
+
+
   -- lemma choice left
 
   lemChoiceEmpL : (e : RegExp) -> (e + Emp) :=: e
@@ -90,7 +102,7 @@ module Semantics.Equivalence {Token : Set}(eqTokenDec : Decidable {A = Token} _=
 
                          part2 : forall xs e -> xs <-[[ e ]] -> xs <-[[ e + e ]]
                          part2 .[] .Eps Eps = Eps <+ Eps
-                         part2 .(a ∷ []) .(# a) (# a) = # a <+ # a
+                         part2 .(a :: []) .(# a) (# a) = # a <+ # a
                          part2 xs' ._ (pr * pr₁ <= eq) = (_ o _) <+ pr * pr₁ <= eq
                          part2 xs' ._ (e' <+ pr) = (_ + e') <+ e' <+ pr
                          part2 xs' ._ (e₁ +> pr) = (e₁ + _) <+ e₁ +> pr
@@ -228,6 +240,21 @@ module Semantics.Equivalence {Token : Set}(eqTokenDec : Decidable {A = Token} _=
                       part2 xs e ((_ +> ((_<+_ {xs = []} _ Eps) * pr' <= eq)) *) rewrite eq = part2 _ _ pr'
                       part2 xs e ((_ <+ pr) *) = (_ <+ pr) *
 
+  lemmaKleeneIdem : (e : RegExp) -> e * :=: (e *) *
+  lemmaKleeneIdem e xs = part1 e , {!!}
+                         where
+                           subsetLemma : forall {xs} e -> xs <-[[ e ]] -> xs <-[[ e * ]]
+                           subsetLemma Eps Eps = (_ <+ Eps) *
+                           subsetLemma {xs = .a :: []}(# .a) (# a) = (_ +> {!!}) *
+                           subsetLemma ._ (pr * pr' <= eq) = {!!}
+                           subsetLemma ._ (e' <+ pr) = {!!}
+                           subsetLemma ._ (e₁ +> pr) = {!!}
+                           subsetLemma ._ (pr *) = {!!}
+                           
+                           part1 : forall {xs} e -> xs <-[[ e * ]] -> xs <-[[ (e *) * ]]
+                           part1 e ((_ +> (pr * pr' <= eq)) *) rewrite eq = (_ +> subsetLemma _ pr * {!!} <= refl) *
+                           part1 e ((_ <+ pr) *) = (_ <+ pr) *
+
   -- algebraic structure of regular expressions
 
   concatMonoid : Monoid _ _
@@ -257,5 +284,5 @@ module Semantics.Equivalence {Token : Set}(eqTokenDec : Decidable {A = Token} _=
                           = record {
                                    isEquivalence = RegExpEquiv
                                    ; assoc = \ e e' e'' xs -> :=:-sym (lemChoiceAssoc e e' e'') xs
-                                   ; ∙-cong = {!!} }
+                                   ; ∙-cong = :=:-choiceCong }
                         ; identity = lemChoiceEmpR , lemChoiceEmpL } }
