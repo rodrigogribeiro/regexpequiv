@@ -251,7 +251,6 @@ module Semantics.Equivalence {Token : Set}(eqTokenDec : Decidable {A = Token} _=
 
   subsetLemma : forall {xs} e -> xs <-[[ e ]] -> xs <-[[ e * ]]
   subsetLemma {xs = xs} e pr = (_ +> pr * ((_ <+ Eps) *) <= solve 1 (\ xs -> xs :== xs :++ :[]) refl xs) *
-  
 
   lemmaKleeneIdem : (e : RegExp) -> e * :=: (e *) *
   lemmaKleeneIdem e xs = part1 e , part2 e
@@ -260,9 +259,12 @@ module Semantics.Equivalence {Token : Set}(eqTokenDec : Decidable {A = Token} _=
                            part1 e ((_ +> (pr * pr' <= eq)) *) rewrite eq = (_ +> (subsetLemma _ pr) * (subsetLemma _ pr') <= refl) *
                            part1 e ((_ <+ pr) *) = (_ <+ pr) *
 
+                           lemma : forall {xs ys} e -> xs <-[[ e o e * ]] -> ys <-[[ e * ]] -> (xs ++ ys) <-[[ e * ]]
+                           lemma {xs = xs}{ys = ys} e pr pr' = {!!}
+
                            part2 : forall {xs} e -> xs <-[[ (e *) * ]] -> xs <-[[ e * ]]
                            part2 e ((_ +> ((_ <+ pr) *) * pr' <= eq) *) rewrite eq | Eps<-Inv pr = part2 _ pr'
-                           part2 e ((_ +> ((_ +> pr) *) * pr' <= eq) *) rewrite eq = (_ +> {!!}) *
+                           part2 e ((_ +> ((_ +> pr) *) * pr' <= eq) *) rewrite eq = lemma e pr (part2 _ pr')
                            part2 e ((_ <+ pr ) *) = (_ <+ pr) *
 
   -- algebraic structure of regular expressions
