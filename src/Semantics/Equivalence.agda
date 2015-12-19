@@ -249,23 +249,31 @@ module Semantics.Equivalence {Token : Set}(eqTokenDec : Decidable {A = Token} _=
                       part2 xs e ((_ +> ((_<+_ {xs = []} _ Eps) * pr' <= eq)) *) rewrite eq = part2 _ _ pr'
                       part2 xs e ((_ <+ pr) *) = (_ <+ pr) *
 
-  subsetLemma : forall {xs} e -> xs <-[[ e ]] -> xs <-[[ e * ]]
-  subsetLemma {xs = xs} e pr = (_ +> pr * ((_ <+ Eps) *) <= solve 1 (\ xs -> xs :== xs :++ :[]) refl xs) *
 
   lemmaKleeneIdem : (e : RegExp) -> e * :=: (e *) *
-  lemmaKleeneIdem e xs = part1 e , part2 e
-                         where                           
-                           part1 : forall {xs} e -> xs <-[[ e * ]] -> xs <-[[ (e *) * ]]
-                           part1 e ((_ +> (pr * pr' <= eq)) *) rewrite eq = (_ +> (subsetLemma _ pr) * (subsetLemma _ pr') <= refl) *
-                           part1 e ((_ <+ pr) *) = (_ <+ pr) *
+  lemmaKleeneIdem e xs = subsetLemma (e *) , subsetLemma' e
+                         where
+                           mem : forall {xs e} -> xs <-[[ e ]] -> List _
+                           mem {xs = xs} _ = xs
 
-                           lemma : forall {xs ys} e -> xs <-[[ e o e * ]] -> ys <-[[ e * ]] -> (xs ++ ys) <-[[ e * ]]
-                           lemma {xs = xs}{ys = ys} e pr pr' = {!!}
+                           assoc1 : forall {A : Set}(xs ys zs : List A) -> (xs ++ ys) ++ zs == xs ++ (ys ++ zs)
+                           assoc1 = solve 3 (\ xs ys zs -> (xs :++ ys) :++ zs :== xs :++ (ys :++ zs)) refl
 
-                           part2 : forall {xs} e -> xs <-[[ (e *) * ]] -> xs <-[[ e * ]]
-                           part2 e ((_ +> ((_ <+ pr) *) * pr' <= eq) *) rewrite eq | Eps<-Inv pr = part2 _ pr'
-                           part2 e ((_ +> ((_ +> pr) *) * pr' <= eq) *) rewrite eq = lemma e pr (part2 _ pr')
-                           part2 e ((_ <+ pr ) *) = (_ <+ pr) *
+                           lem' : forall {xs ys zs} e -> zs == xs ++ ys -> xs <-[[ e ]]  -> ys <-[[ e * ]] -> zs <-[[ e * ]]
+                           lem' e refl pr pr' = (_ +> pr * pr' <= refl) *
+
+                           lem : forall {xs ys zs} e -> zs == xs ++ ys -> xs <-[[ e * ]] -> ys <-[[ e * ]] -> zs <-[[ e * ]]
+                           lem e refl ((.(e o e *) <+ Eps) *)    q = q
+                           lem e eq ((.Eps +> p * p₁ <= refl) *) q rewrite assoc1 (mem p) (mem p₁) (mem q)
+                               = lem' e eq p (lem e refl p₁ q)
+
+                           subsetLemma' : forall {xs} e -> xs <-[[ e * * ]] -> xs <-[[ e * ]]
+                           subsetLemma' e ((.(e * o e * *) <+ pr) *)   = ((e o e *) <+ pr) *
+                           subsetLemma' e ((.Eps +> pr * pr₁ <= eq) *) = lem e eq pr (subsetLemma' e pr₁)
+
+                           subsetLemma : forall {xs} e -> xs <-[[ e ]] -> xs <-[[ e * ]]
+                           subsetLemma {xs = xs} e pr = (_ +> pr * ((_ <+ Eps) *) <= solve 1 (\ xs -> xs :== xs :++ :[]) refl xs) *
+
 
   -- algebraic structure of regular expressions
 
@@ -336,25 +344,25 @@ module Semantics.Equivalence {Token : Set}(eqTokenDec : Decidable {A = Token} _=
                           ; zero = lemConcatEmpL , lemConcatEmpR }
                      }
                    where
-                     open Semigroup
                      leftdistr : forall (e e' e'' : RegExp) -> e o (e' + e'') :=: (e o e') + (e o e'')
                      leftdistr e e' e'' xs = part1 e e' e'' xs , part2 e e' e'' xs
                                              where
                                                part1 : forall e e' e'' xs -> xs <-[[ e o (e' + e'') ]] -> xs <-[[ (e o e') + (e o e'') ]]
-                                               part1 e e' e'' xs (pr * (_ +> pr') <= eq) rewrite eq = _ +> pr * pr' <= Relation.Binary.PropositionalEquality.refl
-                                               part1 e e' e'' xs (pr * (_ <+ pr') <= eq) rewrite eq = _ <+ pr * pr' <= Relation.Binary.PropositionalEquality.refl
+                                               part1 e e' e'' xs (pr * (_ +> pr') <= eq) rewrite eq = _ +> pr * pr' <= refl
+                                               part1 e e' e'' xs (pr * (_ <+ pr') <= eq) rewrite eq = _ <+ pr * pr' <= refl
 
                                                part2 : forall e e' e'' xs -> xs <-[[ (e o e') + (e o e'') ]] -> xs <-[[ e o (e' + e'') ]]
-                                               part2 e e' e'' xs (_ <+ (pr * pr' <= eq)) rewrite eq = pr * (_ <+ pr') <= Relation.Binary.PropositionalEquality.refl
-                                               part2 e e' e'' xs (_ +> (pr * pr' <= eq)) rewrite eq = pr * (_ +> pr') <= Relation.Binary.PropositionalEquality.refl
+                                               part2 e e' e'' xs (_ <+ (pr * pr' <= eq)) rewrite eq = pr * (_ <+ pr') <= refl
+                                               part2 e e' e'' xs (_ +> (pr * pr' <= eq)) rewrite eq = pr * (_ +> pr') <= refl
 
                      rightdistr : forall (e e' e'' : RegExp) -> ((e + e') o e'') :=: ((e o e'') + (e' o e''))
                      rightdistr e e' e'' xs = part1 e e' e'' xs , part2 e e' e'' xs
                                               where
                                                 part1 : forall e e' e'' xs -> xs <-[[ (e + e') o e'' ]] -> xs <-[[ e o e'' + e' o e'' ]]
-                                                part1 e e' e'' xs ((_ <+ pr) * pr' <= eq) rewrite eq = _ <+ (pr * pr' <= Relation.Binary.PropositionalEquality.refl)
-                                                part1 e e' e'' xs ((_ +> pr) * pr' <= eq) rewrite eq = _ +> (pr * pr' <= Relation.Binary.PropositionalEquality.refl)
+                                                part1 e e' e'' xs ((_ <+ pr) * pr' <= eq) rewrite eq = _ <+ (pr * pr' <= refl)
+                                                part1 e e' e'' xs ((_ +> pr) * pr' <= eq) rewrite eq = _ +> (pr * pr' <= refl)
 
                                                 part2 : forall e e' e'' xs -> xs <-[[ e o e'' + e' o e'' ]] -> xs <-[[ (e + e') o e'' ]]
-                                                part2 e e' e'' xs (_ <+ (pr * pr' <= eq)) rewrite eq = (_ <+ pr) * pr' <= Relation.Binary.PropositionalEquality.refl
-                                                part2 e e' e'' xs (_ +> (pr * pr' <= eq)) rewrite eq = (_ +> pr) * pr' <= Relation.Binary.PropositionalEquality.refl
+                                                part2 e e' e'' xs (_ <+ (pr * pr' <= eq)) rewrite eq = (_ <+ pr) * pr' <= refl
+                                                part2 e e' e'' xs (_ +> (pr * pr' <= eq)) rewrite eq = (_ +> pr) * pr' <= refl
+                     open Semigroup
